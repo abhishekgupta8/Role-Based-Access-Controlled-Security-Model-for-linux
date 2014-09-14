@@ -1,0 +1,115 @@
+                                                    SBRACK (Stony Brook Role based Access Control Kernel)
+
+INTRODUCTION:
+    
+     Role-based access control (RBAC) is an approach for restricting system access to authorized users by assigning users roles and defining policies to restrict and allowing policies.
+
+IMPLEMENTATION LOGIC AND ASSUMPTIONS:
+    1) The RBAC model is made on top of ACL already implemented in linux. This means that RBAC is making the system more restrictive.
+    2) Every user is attached with a role. This role is mapped using UID.
+    3) Every file in the system created after loading the RBAC is also attached with a role. The role to file mapping is done using inode number.
+    4) Policies defined in the system governs the access of objects that which role subjects can access which role objects.
+    5) This means that every role has a rule which tells that users of role 'A' can either access or not access the files of role 'B'.
+    6) Either subjects can have full access on objects or they are completely denied. Partial access like read-only or write-only is not supported by RBAC.
+    7) By-default any file created by user is attached with the same role as that of user.
+    8) So user of any role can at least access the files tagged with his role.
+    9) The role of user as well as role of file can be changed by administrator.
+    10) Also, the policies can be added or modified by administrator.
+    11) Administrator has to tag every user with a role using user-application. But the files are automatically labelled by the role of the user who creates the file.
+    12) If the user is not added in the system, all the files he will make will not be labelled and these files will not be protected by RBAC.
+    13) Also, the files present in the system prior to enabling RBAC will again be out of scope of the RBAC.
+    14) In case of situation where RBAC is not able to make the decision as it may not have mapped-user or/and mapped-file, it will grant the access.
+    15) ROOT user is allowed to do all the operations on all the objects.
+    
+FEATURES OF PROJECT:
+    1) Users can be added to the RBAC.
+    2) Users' role can be changed from all the roles defined in the policy store.
+    3) Users can be removed from RBAC.
+    4) Files can be added to the RBAC manually. Also, files are added dynamically when user creates a file with RBAC enabled.
+    5) Files' role can be changed from all the roles defined in the policy store.
+    6) Files can be removed from RBAC manually. Also, files are removed dynamically when user deletes a file with RBAC enabled.
+    7) Roles can be added with rules which needs to be defined while creating roles.
+    8) Roles can be modified by modifying the rules of the roles.
+    9) Roles can be deleted provided that role is not being used by any user or any file.
+    
+HOOKS EXPOILTED:
+->inode_create = This hook is used to check whether or not user has the permission to create a file in the parent directory he is trying to create. So parent directory's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_link = This hook is used to check whether or not user has the permission to create a hard link of the file he is trying to create. So file's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_unlink = This hook is used to check whether or not user has the permission to delete the file he is trying to delete. So file's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_symlink = This hook is used to check whether or not user has the permission to create a soft link of the file he is trying to create. So file's inode number is checked against UID of user in policy store to check compatibility.
+       
+->inode_mkdir = This hook is used to check whether or not user has the permission to create a directory in the parent directory he is trying to create. So parent directory's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_rmdir = This hook is used to check whether or not user has the permission to delete a directory he is trying to delete. So directory's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_rename = This hook is used to check whether or not user has the permission to move/copy/rename directory/file he is trying to move/copy/rename. So directory's/file's inode number is checked against UID of user in policy store to check compatibility. Also, parent inode number of destination directory is also checked against UID of user in policy store to check compatibility.
+
+->inode_readlink = This hook is used to check whether or not user has the permission to read a softlink he is trying to read. So softlink's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_permission = This hook is used to check whether or not user has the permission to read/write a file/hardlink he is trying to read/write. So file's/ hardlink's inode number is checked against UID of user in policy store to check compatibility.
+
+->inode_init_security = This hook is used to assign a role to the inode created by inode_create or inode_mkdir. This function is atomically called by the fs itself to enable labelling with out any breach.
+
+POLICY STORE:
+    1) Three file are created named /etc/user_role, /etc/file_role and /etc/role_rule.
+        1.1) /etc/user_role: This file contains the user to role mapping. This file should look like something shown below:
+            1001,MS
+            1002,PHD
+            1003,PHD
+            Where first column is UID and second column is role.
+        1.2) /etc/file_role: This file contains the file to role mapping. This file should look like something shown below:
+            584681,MS
+            484610,PHD
+            648621,PHD
+            Where first column is inode number and second column is role.
+        1.3) /etc/role_rule: This file contains all the roles and their rules. This file should look like something shown below:
+            1,MS,MS
+            2,PHD,PHD
+            3,PROF,PROF|MS|PHD
+            Where first column is role id, second column is role name and third column are the names of roles this role is allowed to access. Example, professor is allowed to access files of PHD as well MS and obviously PROF itself but MS and PHD can access only their respective files.
+    2) The files of policy store is protected by the RBAC implementation itself and so they are immutable by any user except administrator.
+    
+FILES FOR SUBMISSION:
+    linux-3.14.17/security/sbrack:
+        1) user_application.c: This file contains the source code of user application which can be used to edit the policy store and change labels on users and files.
+        2) sbrack.c: This file contains the source code of all the exploited hooks.
+        3) sbrack.h: This file contains the supporting functions for querying policy store and returning it to sbrack.c
+        4) Makefile
+        5) kconfig
+        6) README: Documentation of code.
+    linux-3.14.17/security
+        7) Makefile
+        8) kconfig
+    /etc/
+        9) user_role: Configuration file of policy store.
+        10) file_role: Configuration file of policy store.
+        11) role_rule: Configuration file of policy store.
+    
+INSTALLATION INSTRUCTIONS:
+    1) The rar file given should be unzipped.
+    2) The sbrack directory should be placed in linux-3.14.17/security.
+    3) Makefile and kconfig should be placed in linux-3.14.17/security.
+    4) Execute the following commands:
+    
+    $ cd linux-3.14.17/security
+    $ cp sbrack/user_role /etc
+    $ cp sbrack/file_role /etc
+    $ cp sbrack/role_rule /etc
+    $ chmod 777 /etc/user_role
+    $ chmod 777 /etc/file_role
+    $ chmod 777 /etc/role_rule
+    $ echo `stat /etc/user_role | grep Inode | cut -d':' -f3 | cut -d'L' -f1 | sed 's/[[:space:]]//g'`",ADMIN,">>/etc/file_role
+    $ echo `stat /etc/file_role | grep Inode | cut -d':' -f3 | cut -d'L' -f1 | sed 's/[[:space:]]//g'`",ADMIN,">>/etc/file_role
+    $ echo `stat /etc/role_rule | grep Inode | cut -d':' -f3 | cut -d'L' -f1 | sed 's/[[:space:]]//g'`",ADMIN,">>/etc/file_role
+    $ cd ..
+    $ make menuconfig //select sbrack in security options
+    $ make && make modules_install && make install && reboot
+    $ cd linux-3.14.17/security/sbrack
+    $ gcc user_application.c -o user_application
+    
+    These commands will copy the configuration files in /etc and will add these files' inode numbers to policy store such that no one can access these files. Also don't forget to select the sbrack in security options of make menuconfig.
+    
+    To access the user application go to linux-3.14.17/security/sbrack and enter ./user_application on the console to launch.

@@ -1,0 +1,9 @@
+config SECURITY_SBRACK
+	bool "SBRACK Support"
+	depends on SECURITY
+	select NETWORK_SECMARK
+	default n
+	help
+	  This selects SBRACK LSM.
+          see recluze.wordpress.com for more details
+
